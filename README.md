@@ -5,7 +5,7 @@ GitHub Projectの運用を自動化するための再利用可能なワークフ
 ## 提供するワークフロー一覧
 
 | ワークフロー | 目的 |
-|---|---|
+| --- | --- |
 | [auto-assign-pr-creator.yml](.github/workflows/auto-assign-pr-creator.yml) | PR作成者を自動でAssigneeに設定 |
 | [auto-label-subsystem.yml](.github/workflows/auto-label-subsystem.yml) | リポジトリTopicからサブシステムラベルを自動付与 |
 | [auto-label-tag.yml](.github/workflows/auto-label-tag.yml) | リポジトリTopicからTAGラベルを自動付与 |
@@ -23,8 +23,6 @@ GitHub Projectの運用を自動化するための再利用可能なワークフ
 2. PRの作成者を取得する
 3. 作成者が既にAssigneeに含まれていないことを確認する
 4. 作成者をAssigneeとして追加する
-
-### 導入方法
 
 以下の内容で `.github/workflows/assign-pr-creator.yaml` を作成するだけで導入できます。
 
@@ -57,7 +55,7 @@ jobs:
 **Topicとラベルのマッピング**:
 
 | Topicサフィックス | ラベル | 例 |
-|---|---|---|
+| --- | --- | --- |
 | `cdh` | `sys::CDH` | `geox-cdh` |
 | `thermal` | `sys::熱` | `geox-thermal` |
 | `structure` | `sys::構造` | `geox-structure` |
@@ -72,8 +70,6 @@ jobs:
 | `system` | `sys::システム` | `geox-system` |
 | `sw-team`（完全一致） | `sys::SW` | `sw-team` |
 | `se-team`（完全一致） | `sys::SE` | `se-team` |
-
-### 導入方法
 
 以下の内容で `.github/workflows/auto-label-subsystem.yaml` を作成するだけで導入できます。
 
@@ -92,7 +88,11 @@ jobs:
 ```
 
 > [!NOTE]
-> この自動化は `GITHUB_TOKEN` のみで動作し、追加のSecrets設定は不要です。リポジトリのTopicは GitHub の Settings > General > Topics から設定できます。Topic名は [issl-autoproject の rules.yaml](https://github.com/ut-issl/issl-autoproject/blob/main/rules.yaml) と同じ命名規則に従ってください。
+> この自動化は `GITHUB_TOKEN` のみで動作し、追加のSecrets設定は不要です。
+> リポジトリのTopicは GitHub の Settings > General > Topics から設定できます。
+> Topic名は
+> [issl-autoproject の rules.yaml](https://github.com/ut-issl/issl-autoproject/blob/main/rules.yaml)
+> と同じ命名規則に従ってください。
 
 ## TAGラベル自動付与 (`auto-label-tag.yml`)
 
@@ -108,12 +108,10 @@ jobs:
 **Topicとラベルのマッピング**:
 
 | Topic | ラベル |
-|---|---|
+| --- | --- |
 | `autonomy-tag` | `tag::autonomy` |
 | `formal-methods-tag` | `tag::formal-methods` |
 | `inference-tag` | `tag::inference` |
-
-### 導入方法
 
 以下の内容で `.github/workflows/auto-label-tag.yaml` を作成するだけで導入できます。
 
@@ -132,7 +130,9 @@ jobs:
 ```
 
 > [!NOTE]
-> この自動化は `GITHUB_TOKEN` のみで動作し、追加のSecrets設定は不要です。リポジトリのTopicは GitHub の Settings > General > Topics から `{tag名}-tag`（例: `autonomy-tag`）の形式で設定してください。
+> この自動化は `GITHUB_TOKEN` のみで動作し、追加のSecrets設定は不要です。
+> リポジトリのTopicは GitHub の Settings > General > Topics から
+> `{tag名}-tag`（例: `autonomy-tag`）の形式で設定してください。
 
 ## Iteration自動付与 (`set-iteration-on-close.yml`)
 
@@ -145,8 +145,6 @@ jobs:
 3. そのIssue/PRが紐付いている全てのGitHub Projectを確認する
 4. Iterationフィールドを持つProjectに対して、現在の日付に対応するIterationを自動設定する
 5. Iterationフィールドがない、または現在のIterationが見つからないProjectはスキップされる
-
-### 導入方法
 
 以下の内容で `.github/workflows/close-set-iteration.yaml` を作成するだけで導入できます。
 
@@ -168,7 +166,11 @@ jobs:
 ```
 
 > [!NOTE]
-> この自動化は、Organization Secretsに登録されたGitHub App（`ITERATION_AUTOMATION_APP_ID`, `ITERATION_AUTOMATION_APP_PRIVATE_KEY`）の認証情報を利用しています。新たにリポジトリを追加する場合は、Organization Secretsの「Repository access」に対象リポジトリを追加する必要があります。
+> この自動化は、Organization Secretsに登録されたGitHub App
+> （`ITERATION_AUTOMATION_APP_ID`, `ITERATION_AUTOMATION_APP_PRIVATE_KEY`）
+> の認証情報を利用しています。
+> 新たにリポジトリを追加する場合は、Organization Secretsの
+> 「Repository access」に対象リポジトリを追加する必要があります。
 
 ## Tracking Status自動更新 (`update-tracking-status.yml`)
 
@@ -187,11 +189,9 @@ jobs:
 **入力パラメータ**:
 
 | パラメータ | 説明 | デフォルト |
-|---|---|---|
+| --- | --- | --- |
 | `project-number` | 対象のGitHub Project番号 | （必須） |
 | `dry-run` | 有効にすると変更を適用せず、更新対象のログ出力のみ行う | `false` |
-
-### 導入方法
 
 以下の内容で `.github/workflows/tracking-update.yaml` を作成するだけで導入できます。
 
@@ -223,7 +223,9 @@ jobs:
 ```
 
 > [!NOTE]
-> この自動化は、Organization Secretsに登録されたGitHub App（`ITERATION_AUTOMATION_APP_ID`, `ITERATION_AUTOMATION_APP_PRIVATE_KEY`）の認証情報を利用しています。
+> この自動化は、Organization Secretsに登録されたGitHub App
+> （`ITERATION_AUTOMATION_APP_ID`, `ITERATION_AUTOMATION_APP_PRIVATE_KEY`）
+> の認証情報を利用しています。
 
 ## Renovate PR Tracking自動更新 (`update-renovate-tracking.yml`)
 
@@ -241,11 +243,9 @@ jobs:
 **入力パラメータ**:
 
 | パラメータ | 説明 | デフォルト |
-|---|---|---|
+| --- | --- | --- |
 | `project-number` | 対象のGitHub Project番号 | （必須） |
 | `dry-run` | 有効にすると変更を適用せず、更新対象のログ出力のみ行う | `false` |
-
-### 導入方法
 
 以下の内容で `.github/workflows/renovate-tracking-update.yaml` を作成するだけで導入できます。
 
@@ -280,4 +280,6 @@ jobs:
 ```
 
 > [!NOTE]
-> この自動化は、Organization Secretsに登録されたGitHub App（`ITERATION_AUTOMATION_APP_ID`, `ITERATION_AUTOMATION_APP_PRIVATE_KEY`）の認証情報を利用しています。
+> この自動化は、Organization Secretsに登録されたGitHub App
+> （`ITERATION_AUTOMATION_APP_ID`, `ITERATION_AUTOMATION_APP_PRIVATE_KEY`）
+> の認証情報を利用しています。

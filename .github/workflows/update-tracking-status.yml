@@ -84,7 +84,11 @@ jobs:
 
           extract_option_id() {
             echo "$META" | jq -r \
-              ".data.organization.projectV2.fields.nodes[] | select(.name == \"$1\") | .options[] | select(.name == \"$2\") | .id"
+              ".data.organization.projectV2.fields.nodes[]
+               | select(.name == \"$1\")
+               | .options[]
+               | select(.name == \"$2\")
+               | .id"
           }
 
           TRACKING_FIELD_ID=$(echo "$META" | jq -r \
