@@ -8,6 +8,7 @@ on:
 
 jobs:
   set-iteration:
+    permissions: {}
     uses: ut-issl/project-workflows/.github/workflows/set-iteration-on-close.yml@main
     secrets:
       ITERATION_AUTOMATION_APP_ID: ${{ secrets.ITERATION_AUTOMATION_APP_ID }}

@@ -8,4 +8,8 @@ on:
 
 jobs:
   auto-label:
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     uses: ut-issl/project-workflows/.github/workflows/auto-label-subsystem.yml@main
