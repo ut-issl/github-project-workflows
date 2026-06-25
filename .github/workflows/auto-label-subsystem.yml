@@ -1,0 +1,83 @@
+name: Auto Label Subsystem (Reusable)
+
+on:
+  workflow_call:
+
+jobs:
+  auto-label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply subsystem labels based on repository topics
+        uses: actions/github-script@v9
+        with:
+          script: |
+            // Mapping from topic suffix/name to label
+            const TOPIC_TO_LABEL = {
+              "cdh": "sys::CDH",
+              "thermal": "sys::熱",
+              "structure": "sys::構造",
+              "comm": "sys::通信",
+              "aocs": "sys::姿勢",
+              "power": "sys::電源",
+              "orbit": "sys::軌道",
+              "propulsion": "sys::推進",
+              "ground": "sys::地上",
+              "payload": "sys::PL",
+              "elec": "sys::電装",
+              "system": "sys::システム",
+              "sw-team": "sys::SW",
+              "se-team": "sys::SE",
+            };
+
+            // Get repository topics
+            const { data: repoData } = await github.rest.repos.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            const topics = repoData.topics || [];
+
+            if (topics.length === 0) {
+              core.info("No topics found on this repository. Skipping.");
+              return;
+            }
+
+            // Resolve labels from topics
+            const labelsToApply = new Set();
+            for (const topic of topics) {
+              // Check exact match first (e.g., "sw-team", "se-team")
+              if (TOPIC_TO_LABEL[topic]) {
+                labelsToApply.add(TOPIC_TO_LABEL[topic]);
+                continue;
+              }
+              // Check suffix match (e.g., "geox-cdh" → "cdh")
+              const suffix = topic.split("-").pop();
+              if (suffix && TOPIC_TO_LABEL[suffix]) {
+                labelsToApply.add(TOPIC_TO_LABEL[suffix]);
+              }
+            }
+
+            if (labelsToApply.size === 0) {
+              core.info(
+                `Topics [${topics.join(", ")}] did not match any subsystem. Skipping.`
+              );
+              return;
+            }
+
+            // Get the issue or PR number
+            const number =
+              context.payload.issue?.number ||
+              context.payload.pull_request?.number;
+            if (!number) {
+              core.warning("No issue or PR number found in event payload");
+              return;
+            }
+
+            const labels = [...labelsToApply];
+            core.info(`Applying labels: ${labels.join(", ")}`);
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: number,
+              labels,
+            });

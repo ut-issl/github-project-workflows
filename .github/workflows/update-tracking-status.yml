@@ -1,0 +1,195 @@
+name: Update Tracking Status (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      project-number:
+        description: "The GitHub Project number to update"
+        required: true
+        type: string
+      tracking-field-name:
+        description: "The name of the tracking field in the project"
+        required: false
+        type: string
+        default: "Tracking"
+      status-field-name:
+        description: "The name of the status field in the project"
+        required: false
+        type: string
+        default: "Status"
+      dry-run:
+        description: "If true, only log changes without applying them"
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      ITERATION_AUTOMATION_APP_ID:
+        required: true
+      ITERATION_AUTOMATION_APP_PRIVATE_KEY:
+        required: true
+
+jobs:
+  update-tracking:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.ITERATION_AUTOMATION_APP_ID }}
+          private-key: ${{ secrets.ITERATION_AUTOMATION_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Update tracking status for project items
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          ORG: ${{ github.repository_owner }}
+          PROJECT_NUMBER: ${{ inputs.project-number }}
+          TRACKING_FIELD: ${{ inputs.tracking-field-name }}
+          STATUS_FIELD: ${{ inputs.status-field-name }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          set -euo pipefail
+
+          echo "Fetching project #${PROJECT_NUMBER} from ${ORG}..."
+
+          # ── Step 1: Get project metadata (field IDs, option IDs) ──
+          META=$(gh api graphql -f query='
+            query($org: String!, $number: Int!) {
+              organization(login: $org) {
+                projectV2(number: $number) {
+                  id
+                  title
+                  fields(first: 20) {
+                    nodes {
+                      ... on ProjectV2SingleSelectField {
+                        id
+                        name
+                        options { id name }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ' -f org="$ORG" -F number="$PROJECT_NUMBER")
+
+          PROJECT_ID=$(echo "$META" | jq -r '.data.organization.projectV2.id')
+          PROJECT_TITLE=$(echo "$META" | jq -r '.data.organization.projectV2.title')
+
+          if [ "$PROJECT_ID" = "null" ] || [ -z "$PROJECT_ID" ]; then
+            echo "::error::Project #${PROJECT_NUMBER} not found in ${ORG}"
+            exit 1
+          fi
+
+          extract_option_id() {
+            echo "$META" | jq -r \
+              ".data.organization.projectV2.fields.nodes[] | select(.name == \"$1\") | .options[] | select(.name == \"$2\") | .id"
+          }
+
+          TRACKING_FIELD_ID=$(echo "$META" | jq -r \
+            ".data.organization.projectV2.fields.nodes[] | select(.name == \"$TRACKING_FIELD\") | .id")
+          TRACKED_OPT=$(extract_option_id "$TRACKING_FIELD" "Tracked")
+          CLOSED_OPT=$(extract_option_id "$TRACKING_FIELD" "Closed")
+          ICEBOX_OPT=$(extract_option_id "$TRACKING_FIELD" "Icebox")
+
+          if [ -z "$TRACKING_FIELD_ID" ]; then
+            echo "::error::Field '${TRACKING_FIELD}' not found in project '${PROJECT_TITLE}'"
+            exit 1
+          fi
+          if [ -z "$TRACKED_OPT" ] || [ -z "$CLOSED_OPT" ] || [ -z "$ICEBOX_OPT" ]; then
+            echo "::error::Required options 'Tracked', 'Closed', and/or 'Icebox' not found in field '${TRACKING_FIELD}'"
+            exit 1
+          fi
+
+          echo "Project: \"${PROJECT_TITLE}\" (${PROJECT_ID})"
+          echo "Field: \"${TRACKING_FIELD}\" (${TRACKING_FIELD_ID})"
+          echo "Options: Tracked=${TRACKED_OPT}, Closed=${CLOSED_OPT}, Icebox=${ICEBOX_OPT}"
+
+          # ── Step 2: Fetch filtered items via REST API ──
+          fetch_item_ids() {
+            local raw_query="$1"
+            local encoded_query
+            encoded_query=$(printf '%s' "$raw_query" | sed 's/ /+/g; s/"/%22/g')
+            gh api --paginate \
+              "orgs/${ORG}/projectsV2/${PROJECT_NUMBER}/items?per_page=100&q=${encoded_query}" \
+              --jq '.[].node_id' 2>/dev/null || true
+          }
+
+          echo ""
+          echo "=== Group A: not Done, not Icebox → Tracked ==="
+          A1=$(fetch_item_ids "-${STATUS_FIELD}:Done -${STATUS_FIELD}:Icebox no:${TRACKING_FIELD}")
+          A2=$(fetch_item_ids "-${STATUS_FIELD}:Done -${STATUS_FIELD}:Icebox ${TRACKING_FIELD}:\"Needs Discussion\"")
+          GROUP_A=$(printf '%s\n%s\n' "$A1" "$A2" | sort -u | sed '/^$/d')
+          GROUP_A_COUNT=0
+          [ -n "$GROUP_A" ] && GROUP_A_COUNT=$(echo "$GROUP_A" | wc -l | tr -d ' ')
+          echo "Items: ${GROUP_A_COUNT}"
+
+          echo ""
+          echo "=== Group B: Done → Closed ==="
+          GROUP_B=$(fetch_item_ids "${STATUS_FIELD}:Done -${TRACKING_FIELD}:Closed" | sort -u | sed '/^$/d')
+          GROUP_B_COUNT=0
+          [ -n "$GROUP_B" ] && GROUP_B_COUNT=$(echo "$GROUP_B" | wc -l | tr -d ' ')
+          echo "Items: ${GROUP_B_COUNT}"
+
+          # ── Step 3: Apply updates via GraphQL mutation ──
+          update_tracking() {
+            gh api graphql -f query='
+              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                updateProjectV2ItemFieldValue(input: {
+                  projectId: $projectId
+                  itemId: $itemId
+                  fieldId: $fieldId
+                  value: { singleSelectOptionId: $optionId }
+                }) {
+                  projectV2Item { id }
+                }
+              }
+            ' -f projectId="$PROJECT_ID" \
+              -f itemId="$1" \
+              -f fieldId="$TRACKING_FIELD_ID" \
+              -f optionId="$2" > /dev/null
+          }
+
+          SUCCESS=0
+          FAIL=0
+
+          process_group() {
+            local label="$1" option_id="$2" items="$3"
+            [ -z "$items" ] && return 0
+            echo ""
+            echo "--- ${label} ---"
+            while IFS= read -r item_id; do
+              [ -z "$item_id" ] && continue
+              if [ "$DRY_RUN" = "true" ]; then
+                echo "[DRY RUN] ${item_id}"
+                SUCCESS=$((SUCCESS + 1))
+              elif update_tracking "$item_id" "$option_id"; then
+                echo "[OK] ${item_id}"
+                SUCCESS=$((SUCCESS + 1))
+              else
+                echo "[FAIL] ${item_id}"
+                FAIL=$((FAIL + 1))
+              fi
+            done <<< "$items"
+          }
+
+          echo ""
+          echo "=== Group C: Icebox → Icebox ==="
+          GROUP_C=$(fetch_item_ids "${STATUS_FIELD}:Icebox -${TRACKING_FIELD}:Icebox" | sort -u | sed '/^$/d')
+          GROUP_C_COUNT=0
+          [ -n "$GROUP_C" ] && GROUP_C_COUNT=$(echo "$GROUP_C" | wc -l | tr -d ' ')
+          echo "Items: ${GROUP_C_COUNT}"
+
+          process_group "Group A → Tracked" "$TRACKED_OPT" "$GROUP_A"
+          process_group "Group B → Closed" "$CLOSED_OPT" "$GROUP_B"
+          process_group "Group C → Icebox" "$ICEBOX_OPT" "$GROUP_C"
+
+          TOTAL=$((GROUP_A_COUNT + GROUP_B_COUNT + GROUP_C_COUNT))
+          echo ""
+          echo "Done. Success: ${SUCCESS}, Failed: ${FAIL}, Total: ${TOTAL}"
+
+          if [ "$FAIL" -gt 0 ]; then
+            echo "::error::${FAIL} update(s) failed."
+            exit 1
+          fi

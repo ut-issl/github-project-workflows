@@ -1,0 +1,35 @@
+name: Auto Assign PR Creator (Reusable)
+
+on:
+  workflow_call:
+
+jobs:
+  assign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assign PR creator as assignee
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            if (!pr) {
+              core.warning("No pull_request found in event payload");
+              return;
+            }
+
+            const creator = pr.user.login;
+            const currentAssignees = pr.assignees.map((a) => a.login);
+
+            if (currentAssignees.includes(creator)) {
+              core.info(`${creator} is already assigned. Skipping.`);
+              return;
+            }
+
+            await github.rest.issues.addAssignees({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              assignees: [creator],
+            });
+
+            core.info(`Assigned ${creator} to PR #${pr.number}`);

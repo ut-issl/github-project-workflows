@@ -1,0 +1,9 @@
+name: Auto Assign PR Creator
+
+on:
+  pull_request:
+    types: [opened]
+
+jobs:
+  assign:
+    uses: ut-issl/project-workflows/.github/workflows/auto-assign-pr-creator.yml@main

@@ -1,0 +1,173 @@
+name: Set Iteration on Close (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      iteration-field-name:
+        description: "The name of the iteration field in the project"
+        required: false
+        type: string
+        default: "Iteration"
+    secrets:
+      ITERATION_AUTOMATION_APP_ID:
+        required: true
+      ITERATION_AUTOMATION_APP_PRIVATE_KEY:
+        required: true
+
+jobs:
+  set-iteration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.ITERATION_AUTOMATION_APP_ID }}
+          private-key: ${{ secrets.ITERATION_AUTOMATION_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Set current iteration on all associated projects
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const fieldName = "${{ inputs.iteration-field-name }}";
+
+            const nodeId =
+              context.payload.issue?.node_id ||
+              context.payload.pull_request?.node_id;
+            if (!nodeId) {
+              core.warning("No issue or PR found in event payload");
+              return;
+            }
+
+            // Get all project items with each project's iteration field in one query
+            const result = await github.graphql(
+              `
+                query ($nodeId: ID!, $fieldName: String!) {
+                  node(id: $nodeId) {
+                    ... on Issue {
+                      projectItems(first: 50) {
+                        nodes {
+                          id
+                          project {
+                            id
+                            title
+                            field(name: $fieldName) {
+                              ... on ProjectV2IterationField {
+                                id
+                                configuration {
+                                  iterations {
+                                    id
+                                    title
+                                    startDate
+                                    duration
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    ... on PullRequest {
+                      projectItems(first: 50) {
+                        nodes {
+                          id
+                          project {
+                            id
+                            title
+                            field(name: $fieldName) {
+                              ... on ProjectV2IterationField {
+                                id
+                                configuration {
+                                  iterations {
+                                    id
+                                    title
+                                    startDate
+                                    duration
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `,
+              { nodeId, fieldName }
+            );
+
+            const items = result.node?.projectItems?.nodes || [];
+            if (items.length === 0) {
+              core.info("Not associated with any project. Skipping.");
+              return;
+            }
+
+            const now = new Date();
+
+            for (const item of items) {
+              const project = item.project;
+              const iterationField = project.field;
+
+              // Skip projects without an iteration field
+              if (!iterationField?.configuration) {
+                core.info(
+                  `Project "${project.title}": No "${fieldName}" field. Skipping.`
+                );
+                continue;
+              }
+
+              // Find the current iteration
+              const currentIteration =
+                iterationField.configuration.iterations.find((iter) => {
+                  const start = new Date(iter.startDate);
+                  const end = new Date(start);
+                  end.setDate(end.getDate() + iter.duration);
+                  return now >= start && now < end;
+                });
+
+              if (!currentIteration) {
+                core.warning(
+                  `Project "${project.title}": No current iteration found. Skipping.`
+                );
+                continue;
+              }
+
+              // Set the iteration
+              await github.graphql(
+                `
+                  mutation (
+                    $projectId: ID!
+                    $itemId: ID!
+                    $fieldId: ID!
+                    $iterationId: String!
+                  ) {
+                    updateProjectV2ItemFieldValue(
+                      input: {
+                        projectId: $projectId
+                        itemId: $itemId
+                        fieldId: $fieldId
+                        value: { iterationId: $iterationId }
+                      }
+                    ) {
+                      projectV2Item {
+                        id
+                      }
+                    }
+                  }
+                `,
+                {
+                  projectId: project.id,
+                  itemId: item.id,
+                  fieldId: iterationField.id,
+                  iterationId: currentIteration.id,
+                }
+              );
+
+              core.info(
+                `Project "${project.title}": Set iteration to "${currentIteration.title}"`
+              );
+            }
