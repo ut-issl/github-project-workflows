@@ -49,12 +49,12 @@ jobs:
           STATUS_FIELD: ${{ inputs.status-field-name }}
           DRY_RUN: ${{ inputs.dry-run }}
         run: |
-          # shellcheck disable=SC2016
           set -euo pipefail
 
           echo "Fetching project #${PROJECT_NUMBER} from ${ORG}..."
 
           # ── Step 1: Get project metadata (field IDs, option IDs) ──
+          # shellcheck disable=SC2016
           META=$(gh api graphql -f query='
             query($org: String!, $number: Int!) {
               organization(login: $org) {
@@ -110,6 +110,7 @@ jobs:
           echo "Tracking field: ${TRACKING_FIELD_ID}, Tracked=${TRACKED_OPT}, Closed=${CLOSED_OPT}"
 
           # ── Step 2: Fetch all Renovate PRs from the project ──
+          # shellcheck disable=SC2016
           ITEMS_QUERY='
             query($org: String!, $number: Int!, $cursor: String) {
               organization(login: $org) {
@@ -142,6 +143,7 @@ jobs:
             }
           '
 
+          # shellcheck disable=SC2016
           JQ_FILTER='
             [.data.organization.projectV2.items.nodes[] |
              select(.content.__typename == "PullRequest") |
@@ -188,6 +190,7 @@ jobs:
 
           # ── Step 3: Apply tracking updates ──
           update_tracking() {
+            # shellcheck disable=SC2016
             gh api graphql -f query='
               mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
                 updateProjectV2ItemFieldValue(input: {

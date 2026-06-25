@@ -54,6 +54,7 @@ jobs:
           echo "Fetching project #${PROJECT_NUMBER} from ${ORG}..."
 
           # ── Step 1: Get project metadata (field IDs, option IDs) ──
+          # shellcheck disable=SC2016
           META=$(gh api graphql -f query='
             query($org: String!, $number: Int!) {
               organization(login: $org) {
@@ -138,6 +139,7 @@ jobs:
 
           # ── Step 3: Apply updates via GraphQL mutation ──
           update_tracking() {
+            # shellcheck disable=SC2016
             gh api graphql -f query='
               mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
                 updateProjectV2ItemFieldValue(input: {
