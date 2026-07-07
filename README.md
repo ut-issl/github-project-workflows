@@ -261,7 +261,7 @@ on:
         description: "GitHub Project number to update"
         required: false
         type: number
-        default: "38"
+        default: "YOUR_PROJECT_NUMBER"
       dry-run:
         description: "Dry run (log only, no changes)"
         required: false
@@ -272,7 +272,7 @@ jobs:
   update-renovate-tracking:
     uses: ut-issl/project-workflows/.github/workflows/update-renovate-tracking.yml@main
     with:
-      project-number: ${{ inputs.project-number || '38' }}
+      project-number: ${{ inputs.project-number || 'YOUR_PROJECT_NUMBER' }}
       dry-run: ${{ inputs.dry-run || false }}
     secrets:
       ITERATION_AUTOMATION_APP_ID: ${{ secrets.ITERATION_AUTOMATION_APP_ID }}
