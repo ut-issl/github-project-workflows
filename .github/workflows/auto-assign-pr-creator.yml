@@ -18,6 +18,13 @@ jobs:
             }
 
             const creator = pr.user.login;
+            const creatorType = pr.user.type;
+
+            if (creatorType !== "User") {
+              core.info(`${creator} is a ${creatorType}, not a User. Skipping.`);
+              return;
+            }
+
             const currentAssignees = pr.assignees.map((a) => a.login);
 
             if (currentAssignees.includes(creator)) {
