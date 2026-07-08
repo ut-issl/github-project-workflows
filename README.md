@@ -1,4 +1,4 @@
-# project-workflows
+# github-project-workflows
 
 GitHub Projectの運用を自動化するための再利用可能なワークフロー（Reusable Workflows）を提供するリポジトリです。
 
