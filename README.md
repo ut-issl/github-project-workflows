@@ -35,7 +35,7 @@ on:
 
 jobs:
   assign:
-    uses: ut-issl/project-workflows/.github/workflows/auto-assign-pr-creator.yml@main
+    uses: ut-issl/github-project-workflows/.github/workflows/auto-assign-pr-creator.yml@main
 ```
 
 > [!NOTE]
@@ -84,7 +84,7 @@ on:
 
 jobs:
   auto-label:
-    uses: ut-issl/project-workflows/.github/workflows/auto-label-subsystem.yml@main
+    uses: ut-issl/github-project-workflows/.github/workflows/auto-label-subsystem.yml@main
 ```
 
 > [!NOTE]
@@ -126,7 +126,7 @@ on:
 
 jobs:
   auto-label:
-    uses: ut-issl/project-workflows/.github/workflows/auto-label-tag.yml@main
+    uses: ut-issl/github-project-workflows/.github/workflows/auto-label-tag.yml@main
 ```
 
 > [!NOTE]
@@ -159,7 +159,7 @@ on:
 
 jobs:
   set-iteration:
-    uses: ut-issl/project-workflows/.github/workflows/set-iteration-on-close.yml@main
+    uses: ut-issl/github-project-workflows/.github/workflows/set-iteration-on-close.yml@main
     secrets:
       ITERATION_AUTOMATION_APP_ID: ${{ secrets.ITERATION_AUTOMATION_APP_ID }}
       ITERATION_AUTOMATION_APP_PRIVATE_KEY: ${{ secrets.ITERATION_AUTOMATION_APP_PRIVATE_KEY }}
@@ -213,7 +213,7 @@ on:
 
 jobs:
   update-tracking:
-    uses: ut-issl/project-workflows/.github/workflows/update-tracking-status.yml@main
+    uses: ut-issl/github-project-workflows/.github/workflows/update-tracking-status.yml@main
     with:
       project-number: ${{ inputs.project-number }}
       dry-run: ${{ inputs.dry-run }}
@@ -270,7 +270,7 @@ on:
 
 jobs:
   update-renovate-tracking:
-    uses: ut-issl/project-workflows/.github/workflows/update-renovate-tracking.yml@main
+    uses: ut-issl/github-project-workflows/.github/workflows/update-renovate-tracking.yml@main
     with:
       project-number: ${{ inputs.project-number || 'YOUR_PROJECT_NUMBER' }}
       dry-run: ${{ inputs.dry-run || false }}

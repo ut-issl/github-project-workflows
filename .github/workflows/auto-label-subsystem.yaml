@@ -12,4 +12,4 @@ jobs:
       contents: read
       issues: write
       pull-requests: write
-    uses: ut-issl/project-workflows/.github/workflows/auto-label-subsystem.yml@main
+    uses: ut-issl/github-project-workflows/.github/workflows/auto-label-subsystem.yml@main
