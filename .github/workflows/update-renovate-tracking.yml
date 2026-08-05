@@ -147,7 +147,10 @@ jobs:
           JQ_FILTER='
             [.data.organization.projectV2.items.nodes[] |
              select(.content.__typename == "PullRequest") |
-             select(.content.author.login == "renovate[bot]") |
+             # GraphQL returns the Renovate bot login as "renovate" (Bot actor),
+             # whereas the REST API / UI show "renovate[bot]". Accept both so the
+             # filter matches regardless of which form the API surfaces.
+             select((.content.author.login // "") | . == "renovate" or . == "renovate[bot]") |
              {
                id,
                pr: "\(.content.repository.nameWithOwner)#\(.content.number)",
