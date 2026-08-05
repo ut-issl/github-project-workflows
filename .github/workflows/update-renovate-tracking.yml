@@ -12,11 +12,6 @@ on:
         required: false
         type: string
         default: "Tracking"
-      status-field-name:
-        description: "The name of the status field in the project"
-        required: false
-        type: string
-        default: "Status"
       dry-run:
         description: "If true, only log changes without applying them"
         required: false
@@ -46,7 +41,6 @@ jobs:
           ORG: ${{ github.repository_owner }}
           PROJECT_NUMBER: ${{ inputs.project-number }}
           TRACKING_FIELD: ${{ inputs.tracking-field-name }}
-          STATUS_FIELD: ${{ inputs.status-field-name }}
           DRY_RUN: ${{ inputs.dry-run }}
         run: |
           set -euo pipefail
@@ -94,20 +88,19 @@ jobs:
 
           TRACKING_FIELD_ID=$(echo "$META" | jq -r \
             ".data.organization.projectV2.fields.nodes[] | select(.name == \"$TRACKING_FIELD\") | .id")
-          TRACKED_OPT=$(extract_option_id "$TRACKING_FIELD" "Tracked")
           CLOSED_OPT=$(extract_option_id "$TRACKING_FIELD" "Closed")
 
           if [ -z "$TRACKING_FIELD_ID" ]; then
             echo "::error::Field '${TRACKING_FIELD}' not found in project '${PROJECT_TITLE}'"
             exit 1
           fi
-          if [ -z "$TRACKED_OPT" ] || [ -z "$CLOSED_OPT" ]; then
-            echo "::error::Required options 'Tracked' and/or 'Closed' not found in field '${TRACKING_FIELD}'"
+          if [ -z "$CLOSED_OPT" ]; then
+            echo "::error::Required option 'Closed' not found in field '${TRACKING_FIELD}'"
             exit 1
           fi
 
           echo "Project: \"${PROJECT_TITLE}\" (${PROJECT_ID})"
-          echo "Tracking field: ${TRACKING_FIELD_ID}, Tracked=${TRACKED_OPT}, Closed=${CLOSED_OPT}"
+          echo "Tracking field: ${TRACKING_FIELD_ID}, Closed=${CLOSED_OPT}"
 
           # ── Step 2: Fetch all Renovate PRs from the project ──
           # shellcheck disable=SC2016
@@ -155,7 +148,6 @@ jobs:
                id,
                pr: "\(.content.repository.nameWithOwner)#\(.content.number)",
                title: .content.title,
-               status: [.fieldValues.nodes[] | select(.field.name? == $sf) | .name][0],
                tracking: [.fieldValues.nodes[] | select(.field.name? == $tf) | .name][0]
              }]
           '
@@ -174,7 +166,7 @@ jobs:
                 -f cursor="$CURSOR")
             fi
 
-            PAGE_ITEMS=$(echo "$RESULT" | jq -c --arg sf "$STATUS_FIELD" --arg tf "$TRACKING_FIELD" "$JQ_FILTER")
+            PAGE_ITEMS=$(echo "$RESULT" | jq -c --arg tf "$TRACKING_FIELD" "$JQ_FILTER")
             RENOVATE_ITEMS=$(echo "$RENOVATE_ITEMS" "$PAGE_ITEMS" | jq -s '.[0] + .[1]')
 
             HAS_NEXT=$(echo "$RESULT" | jq -r '.data.organization.projectV2.items.pageInfo.hasNextPage')
@@ -221,29 +213,23 @@ jobs:
             ITEM_ID=$(echo "$item" | jq -r '.id')
             PR=$(echo "$item" | jq -r '.pr')
             TITLE=$(echo "$item" | jq -r '.title')
-            STATUS=$(echo "$item" | jq -r '.status // "none"')
             TRACKING=$(echo "$item" | jq -r '.tracking // "none"')
 
-            if [ "$STATUS" = "Done" ]; then
-              DESIRED="Closed"
-              DESIRED_OPT="$CLOSED_OPT"
-            else
-              DESIRED="Tracked"
-              DESIRED_OPT="$TRACKED_OPT"
-            fi
-
-            if [ "$TRACKING" = "$DESIRED" ]; then
+            # Renovate PRs never need discussion or manual tracking on the board,
+            # so every Renovate item is forced to Closed regardless of PR state or
+            # project Status. Items already Closed are skipped.
+            if [ "$TRACKING" = "Closed" ]; then
               SKIP=$((SKIP + 1))
               continue
             fi
 
             echo "${PR}: ${TITLE}"
-            echo "  Status=${STATUS}, Tracking=${TRACKING} → ${DESIRED}"
+            echo "  Tracking=${TRACKING} → Closed"
 
             if [ "$DRY_RUN" = "true" ]; then
               echo "  [DRY RUN]"
               SUCCESS=$((SUCCESS + 1))
-            elif update_tracking "$ITEM_ID" "$DESIRED_OPT"; then
+            elif update_tracking "$ITEM_ID" "$CLOSED_OPT"; then
               echo "  [OK]"
               SUCCESS=$((SUCCESS + 1))
             else
