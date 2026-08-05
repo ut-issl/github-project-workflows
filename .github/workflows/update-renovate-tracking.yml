@@ -140,10 +140,12 @@ jobs:
           JQ_FILTER='
             [.data.organization.projectV2.items.nodes[] |
              select(.content.__typename == "PullRequest") |
-             # GraphQL returns the Renovate bot login as "renovate" (Bot actor),
-             # whereas the REST API / UI show "renovate[bot]". Accept both so the
-             # filter matches regardless of which form the API surfaces.
-             select((.content.author.login // "") | . == "renovate" or . == "renovate[bot]") |
+             # Match every Renovate bot by its "renovate" login prefix. This covers
+             # the hosted app (GraphQL "renovate" / REST "renovate[bot]") and any
+             # self-hosted instances such as "renovate-ut-issl-self-hosted", whose
+             # logins likewise start with "renovate". No human account in the org
+             # uses such a login, so a prefix match is safe.
+             select((.content.author.login // "") | startswith("renovate")) |
              {
                id,
                pr: "\(.content.repository.nameWithOwner)#\(.content.number)",
