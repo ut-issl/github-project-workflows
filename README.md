@@ -182,9 +182,15 @@ jobs:
 2. Projectの「Status」フィールドと「Tracking」フィールドの値を基に、更新が必要なアイテムのみをクエリで取得する
 3. 以下のルールに基づいてTrackingフィールドを更新する:
    - **Statusが「Done」のアイテム**: Trackingが「Closed」以外 → 「Closed」に更新
-   - **Statusが「Done」以外のアイテム**: Trackingが「Needs Review」 → 「Tracked」に更新
-   - **Statusが「Done」以外のアイテム**: Trackingが未設定 → 「Tracked」に更新
+   - **Statusが「Icebox」のアイテム**: Trackingが「Icebox」以外 → 「Icebox」に更新
+   - **Statusが「Done」「Icebox」以外のアイテム**: Trackingが未設定 → 「Tracked」に更新
 4. 更新件数と結果がログに出力される
+
+`Needs Review`は、Statusが`Done`または`Icebox`になるまで一括更新では変更しません。
+議論が済んだアイテムは、MTG中に手動で`Tracked`へ戻してください。
+旧名称の`Needs Discussion`も、自動で`Tracked`へ変更する対象から除外しています。
+Statusが`Done`／`Icebox`の場合はそちらを優先し、Trackingが`Needs Review`でも
+それぞれ`Closed`／`Icebox`へ更新します。
 
 **入力パラメータ**:
 
