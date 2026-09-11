@@ -123,9 +123,9 @@ jobs:
 
           echo ""
           echo "=== Group A: not Done, not Icebox → Tracked ==="
-          A1=$(fetch_item_ids "-${STATUS_FIELD}:Done -${STATUS_FIELD}:Icebox no:${TRACKING_FIELD}")
-          A2=$(fetch_item_ids "-${STATUS_FIELD}:Done -${STATUS_FIELD}:Icebox ${TRACKING_FIELD}:\"Needs Discussion\"")
-          GROUP_A=$(printf '%s\n%s\n' "$A1" "$A2" | sort -u | sed '/^$/d')
+          # Review requests must be acknowledged manually, not by the MTG bulk update.
+          GROUP_A=$(fetch_item_ids "-${STATUS_FIELD}:Done -${STATUS_FIELD}:Icebox no:${TRACKING_FIELD}" \
+            | sort -u | sed '/^$/d')
           GROUP_A_COUNT=0
           [ -n "$GROUP_A" ] && GROUP_A_COUNT=$(echo "$GROUP_A" | wc -l | tr -d ' ')
           echo "Items: ${GROUP_A_COUNT}"
